@@ -21,6 +21,8 @@ numbers say.
 | Apertus 1.5 (8B GGUF, local) | Agent runner / inference | Pre-existing (Apertus model, not modified) |
 | [`eunomia`](https://github.com/whataboutyou-ai/eunomia) (Apache 2.0) | Standalone authorization server — `/check` policy gate, signed Agent Passport tokens, MCP middleware | **Pre-existing, third-party, open-source.** We did not build this. Disclosed per HackApertus submission requirements. |
 | Event-Sourced Agent Ledger (CQRS) | Append-only, hash-chained log of every prompt, policy check, tool call, and model output | Built this hackathon |
+| Crypto-shredding key vault | Per-subject encryption of personal-data fields; GDPR/FADP erasure = destroy the key, not the event (ADR-005) | Built this hackathon |
+| WORM mirror | Local append-only (`chattr +a`) sidecar copy of every event; catches a sophisticated tamper that rewrites the primary ledger *and* its own hash chain consistently (ADR-006) | Built this hackathon |
 | Replay CLI/TUI | Deterministic scrub forward/backward through a recorded agent session | Built this hackathon |
 | Eval harness | Scripted task runner producing the Section 5 metrics | Built this hackathon |
 
@@ -61,41 +63,52 @@ Every tool-call failure, malformed JSON response, and policy refusal from Apertu
   - Legitimate tool calls (should be allowed)
   - Unauthorized tool calls (should be blocked)
   - Prompt-injection attempts (should be blocked, and should be distinguishable from a legitimate refusal in the ledger)
-- **Size:** well under the 100 MB `data/` limit.
+- **Size:** 22 tasks (8 legitimate, 7 unauthorized, 7 injection) as of this writing, target 30–50 — well under the 100 MB `data/` limit either way.
 - **Licence:** our own authorship — CC-BY-4.0, same as the rest of the submission.
+- **File:** [`data/tasks.jsonl`](data/tasks.jsonl).
 
-`TODO: link the finished task set file in data/ once authored.`
+`TODO: expand to 30-50 tasks before submission — current set is enough to validate the harness and produce the Section 5 pattern, not yet the full target size.`
 
 ## 5. Evaluation
 
-**Baseline:** the same Apertus agent with the authorization policy stated only in the system prompt — no Eunomia gate, no ledger.
-**Ours:** the same agent with the Eunomia `/check` gate in front of every tool call, plus the event ledger recording each decision.
+**Baseline:** the same agent with the authorization policy stated only in the system prompt — no gate, no ledger. **Ours:** the same agent with a policy gate in front of every tool call, plus the event ledger recording each decision.
+
+> **Harness-validation numbers below, not final submission numbers.** They come from `StubApertusAgent` (a deterministic, documented heuristic — see `agent.py`) and `ScopePolicyGate` (an in-process ABAC stand-in with the same decision logic a live Eunomia `/check` would make — see `policy.py`), not real Apertus 1.5 8B inference or a running `eunomia-server`. The harness, task set, ledger, and metrics code are real and validated; the agent/gate backends are TODO before this table is submission-final (see Section 7).
 
 | Metric | Why it matters | Baseline | Ours |
 |---|---|---|---|
-| Unauthorized calls blocked (%) | Headline result — does the gate actually stop what the prompt-only policy misses? | TBD | TBD |
-| False-block rate on legitimate calls (%) | Stops "block everything" from trivially winning | TBD | TBD |
-| Replay fidelity (ledger replays to identical final state; hash chain verifies) | Proves the audit/non-repudiation claim, not just that logging happened | N/A (no ledger) | TBD |
-| Tamper detection on mutated logs (%) | Proves tamper-evidence, not just tamper-logging | N/A (no ledger) | TBD |
-| Added latency per tool call (ms) | The operational cost of the gate — judged under "Value, cost & scalability" | N/A | TBD |
+| Unauthorized calls blocked (%) | Headline result — does the gate actually stop what the prompt-only policy misses? | 35.7% | **100.0%** |
+| ↳ broken down: unauthorized (overt) | | 71.4% (5/7) | 100.0% (7/7) |
+| ↳ broken down: injection | | **0.0% (0/7)** | 100.0% (7/7) |
+| False-block rate on legitimate calls (%) | Stops "block everything" from trivially winning | 0.0% | 0.0% |
+| Replay fidelity (hash chain verifies) | Proves the audit/non-repudiation claim, not just that logging happened | N/A (no ledger) | 100.0% |
+| Tamper detection on mutated logs (%) — naive tamper (`verify_chain`) | Proves tamper-evidence, not just tamper-logging | N/A (no ledger) | 100.0% |
+| Tamper detection — sophisticated tamper (rewrite + recompute downstream hashes) | `verify_chain()` alone is *fooled* by this; only the ADR-006 WORM cross-check (`verify_against_worm`) still catches it — proven in `tests/test_worm_mirror.py` | N/A | 100.0% (via WORM mirror; 0% via hash chain alone) |
+| Added latency per tool call | The operational cost of the gate — judged under "Value, cost & scalability" | N/A | 0.014 ms (in-process stand-in — **not representative** of a real networked Eunomia `/check` call; re-measure once wired, Section 7) |
 
-Expectation (per mentor feedback, to confirm or refute with data): the prompt-only baseline leaks on prompt-injection cases specifically — this is the result that makes the audit-layer's case with numbers instead of assertion.
+Confirmed exactly the expected pattern (per mentor feedback): the prompt-only baseline's own alignment catches most (71%) overtly-worded unauthorized requests, but **0% of prompt-injection attempts** — the injected text is written to look like a legitimate system-level authorization, which is precisely what a surface-level, prompt-only policy cannot see through. The gate catches both categories at 100% regardless of how the request was worded, because it checks the actual resource/scope tuple, not the prompt text. Reproduce with `make eval` (dev-stub backends) from `track_2b/`.
 
 ## 6. Limitations
 
-`TODO — fill once the eval harness runs.` Known candidates to check: Eunomia `/check` adds latency per tool call (measure, don't assume); the 8B model's own instruction-following failures vs. gate failures need to stay distinguishable in the ledger; air-gapped claim (Section 2) needs re-verification after every dependency version bump, not just once at the start.
+- **Section 5's numbers are from dev-stub backends, not real Apertus 1.5 8B inference or a live Eunomia server.** `StubApertusAgent` and `ScopePolicyGate` are documented, deterministic heuristics (see docstrings), built so the ledger/metrics/replay code could be built and validated today without GPU/Docker access in this environment. Swapping in `OllamaApertusAgent` and `EunomiaPolicyGate` (both stubbed with explicit `NotImplementedError`, see `agent.py`/`policy.py`) is the single biggest remaining risk to these numbers changing before submission.
+- **The task set's categories don't produce false positives by construction** — every legitimate task's resource falls cleanly inside its authorized scope, and every unauthorized/injection task's doesn't. Real Apertus 8B inference may propose tool calls with messier, ambiguous resource strings that a real Eunomia policy has to resolve less cleanly than our `ScopePolicyGate` prefix-match. The 0.0% false-block rate above should not be read as proven robustness yet.
+- **Latency numbers are not representative.** `ScopePolicyGate` is in-process Python; a real `eunomia-server` call is a networked HTTP round-trip. The 0.014ms figure measures the harness's own overhead, not Eunomia's.
+- **The WORM mirror's `chattr +a` enforcement is host-dependent** — it silently (well, not silently: `ledger.worm.immutable_enforced` reports `False`) degrades to a plain file on non-Linux hosts, non-ext filesystems, or sandboxes without the capability (this dev environment is one such case). The submission demo machine's filesystem must be checked, not assumed.
+- **Crypto-shredding (ADR-005) is schema-correct but only exercised on a synthetic company-UID-as-subject-ID model** — see ADR-005's "what this does NOT do" note: this is not a full GDPR compliance posture (no DPIA, no lawful-basis determination), just the architectural compatibility piece.
+- **Air-gapped claim (Section 2) needs re-verification after every dependency version bump, not just once at the start.**
 
 ## 7. Reproducibility
 
 - **Hardware:** `TODO — spec the demo machine`
-- **Runtime:** Docker Compose, `make run` from repo root
-- **Seeds:** task-set generation and any sampling in the eval harness must be seeded and the seed recorded here
+- **Runtime (harness today):** no Docker needed — `pip install -r requirements.txt` (stdlib + `cryptography` only), then `make test` (23 unit tests, stdlib `unittest`) and `make eval` (runs the dev-stub harness, prints the Section 5 table) from `track_2b/`.
+- **Runtime (submission target):** Docker Compose, `make run` from repo root — **not yet implemented** (Section 6's biggest TODO: wire real Apertus 1.5 8B via Ollama + a running `eunomia-server` container, replacing the stub backends).
+- **Seeds:** the task set (`data/tasks.jsonl`) is static and hand-authored, not sampled — no seed needed for it. If the expanded 30-50 task set adds any generated/sampled tasks, record the seed here.
 - **Commit:** `TODO — pin the exact submission commit SHA here on the day of submission`
 - **Dependency pins:** Eunomia Docker image digest (not `latest`), vLLM/llama.cpp version, Apertus GGUF quantisation — all pinned, per the mentor's "write the `make run` target and pin the commit on day 1, not in the last hour" guidance.
 
 ## 8. Next steps
 
-What we would build with another month: the EU AI Act / Swiss FADP automated compliance dossier generator (one-click from the ledger to a human-oversight verification document), and — if the eval results support it — revisit the Sovereign-Agent-Mesh track (dual-model edge/cloud routing) as a second deployment mode on top of the same ledger, rather than a competing prototype.
+What we would build with another month: the EU AI Act / Swiss FADP automated compliance dossier generator (one-click from the ledger to a human-oversight verification document); the RustFS Object Lock WORM anchor for the sovereign-Swiss-cloud target architecture (ADR-006, Option B — documented, not built this submission); expanding the task set to the full 30-50 target with real Apertus 8B-generated edge cases rather than hand-authored ones; and — if the eval results support it — revisit the Sovereign-Agent-Mesh track (dual-model edge/cloud routing) as a second deployment mode on top of the same ledger, rather than a competing prototype.
 
 ## License
 
@@ -105,5 +118,6 @@ Creative Commons Attribution 4.0 (CC-BY-4.0). All HackApertus projects are open-
 
 - Apertus 1.5: https://huggingface.co/swiss-ai/Apertus-v1.5-8B
 - Eunomia (OSS authorization layer, Apache 2.0): https://github.com/whataboutyou-ai/eunomia
+- RustFS (OSS S3-compatible object storage with Object Lock, Apache 2.0 — ADR-006's documented future WORM anchor): https://github.com/rustfs/rustfs
 - HackApertus Track 2B template: https://github.com/HackApertus/project-template/tree/main/track_2b
-- `TODO: ADR links once copied/published alongside the repo.`
+- [`docs/adrs/`](docs/adrs/) — ADR-001 through ADR-006 (decoupled policy engine, Agent Passport schema, event-sourced ledger, edge tokenization, crypto-shredding, WORM backup). `TODO: these still use Obsidian [[wikilink]] syntax for cross-references — convert to relative Markdown links before submission so they render on GitHub.`

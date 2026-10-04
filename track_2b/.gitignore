@@ -16,6 +16,12 @@ __pycache__/
 .venv/
 venv/
 
+# Generated eval artifacts — the task set (tasks.jsonl) is committed,
+# but the ledger DB, key vault, and WORM mirror it produces are not.
+data/eval_run.db
+data/*.keys.db
+data/*.worm.jsonl
+
 # Node
 node_modules/
 dist/
