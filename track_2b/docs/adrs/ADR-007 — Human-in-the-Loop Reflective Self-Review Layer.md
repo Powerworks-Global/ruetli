@@ -1,6 +1,6 @@
 # ADR-007: Human-in-the-Loop Reflective Self-Review Layer
 
-**Status:** Proposed
+**Status:** Accepted — implemented in `eval/reflection.py`, `tests/test_reflection.py` (17 tests), wired into `eval.cli reflect` / `make reflect`
 **Date:** 2026-10-05
 **Deciders:** William Power
 **Project:** Swiss AI Hackathon — Apertus 1.5 (Core for Project 1: Rütli / Apertus-Auditor)

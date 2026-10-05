@@ -1,4 +1,4 @@
-.PHONY: run test eval
+.PHONY: run test eval reflect
 
 # Replace with the command that starts the project in a Docker container,
 # e.g. `docker compose up`. It must work from a clean checkout.
@@ -16,3 +16,7 @@ test:
 # see the TODO above.
 eval:
 	PYTHONPATH=src python3 -m eval.cli run-eval
+
+# ADR-007: advisory-only self-review pass over the last `make eval` batch.
+reflect:
+	PYTHONPATH=src python3 -m eval.cli reflect

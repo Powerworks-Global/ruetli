@@ -5,6 +5,9 @@ Commands:
                      Section 5 metrics table.
   replay RUN_ID      Print the timeline for one run (see replay.py).
   shred SUBJECT_ID   GDPR/FADP erasure — destroy a subject's key (ADR-005).
+  reflect            Run the self-review pass over the last eval batch and
+                      print its findings (ADR-007). Advisory only — never
+                      changes policy/scopes/prompts on its own.
 
 Uses the dev-stub agent and the ScopePolicyGate stand-in for a live
 Eunomia server (see policy.py / agent.py docstrings) — not yet wired to
@@ -26,6 +29,7 @@ from eval.metrics import (
     tamper_detection_rate,
 )
 from eval.policy import ScopePolicyGate
+from eval.reflection import format_report, generate_reflection
 from eval.replay import print_timeline
 from eval.runner import run_condition
 from eval.tasks import load_tasks
@@ -33,6 +37,8 @@ from eval.tasks import load_tasks
 TRACK_ROOT = Path(__file__).resolve().parents[2]
 TASKS_PATH = TRACK_ROOT / "data" / "tasks.jsonl"
 LEDGER_PATH = TRACK_ROOT / "data" / "eval_run.db"
+REFLECTION_STATE_PATH = TRACK_ROOT / "data" / "reflection_state.json"
+EVAL_RUN_PREFIX = "eval"
 
 
 def cmd_run_eval(_args: argparse.Namespace) -> None:
@@ -40,7 +46,7 @@ def cmd_run_eval(_args: argparse.Namespace) -> None:
     ledger = Ledger(LEDGER_PATH)
     agent = StubApertusAgent()
 
-    baseline_run_prefix = "eval"
+    baseline_run_prefix = EVAL_RUN_PREFIX
     baseline_results = run_condition(ledger, baseline_run_prefix, "baseline", tasks, agent, gate=None)
     ours_results = run_condition(ledger, baseline_run_prefix, "ours", tasks, agent, gate=ScopePolicyGate())
 
@@ -74,6 +80,15 @@ def cmd_shred(args: argparse.Namespace) -> None:
     ledger.close()
 
 
+def cmd_reflect(_args: argparse.Namespace) -> None:
+    tasks = load_tasks(TASKS_PATH)
+    ledger = Ledger(LEDGER_PATH)
+    reflection_run_id, findings = generate_reflection(ledger, EVAL_RUN_PREFIX, tasks, REFLECTION_STATE_PATH)
+    print(f"Reflection recorded as ledger run '{reflection_run_id}' (ADR-007 — advisory only).\n")
+    print(format_report(findings))
+    ledger.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m eval.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -87,6 +102,8 @@ def main() -> None:
     shred_parser = sub.add_parser("shred")
     shred_parser.add_argument("subject_id")
     shred_parser.set_defaults(func=cmd_shred)
+
+    sub.add_parser("reflect").set_defaults(func=cmd_reflect)
 
     args = parser.parse_args()
     args.func(args)

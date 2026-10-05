@@ -21,6 +21,7 @@ venv/
 data/eval_run.db
 data/*.keys.db
 data/*.worm.jsonl
+data/reflection_state.json
 
 # Node
 node_modules/
