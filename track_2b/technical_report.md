@@ -42,7 +42,7 @@ Rütli is deployable as:
 
 **External dependencies** (build-time only, per the air-gapped constraint above):
 - `swiss-ai/Apertus-v1.5-8B` weights (GGUF quantization, via Ollama/llama.cpp)
-- `eunomia-ai` Python package or `ttommitt/eunomia-server` Docker image — **pin to a digest, not `latest`**, before submission (reproducibility requirement, Section 7)
+- `eunomia-ai` Python package or `ttommitt/eunomia-server` Docker image — **pin to a digest, not `latest`**, before submission (reproducibility requirement, Section 8)
 - Standard Python/Docker base images
 
 ## 3. Use of Apertus
@@ -73,7 +73,7 @@ Every tool-call failure, malformed JSON response, and policy refusal from Apertu
 
 **Baseline:** the same agent with the authorization policy stated only in the system prompt — no gate, no ledger. **Ours:** the same agent with a policy gate in front of every tool call, plus the event ledger recording each decision.
 
-> **Harness-validation numbers below, not final submission numbers.** They come from `StubApertusAgent` (a deterministic, documented heuristic — see `agent.py`) and `ScopePolicyGate` (an in-process ABAC stand-in with the same decision logic a live Eunomia `/check` would make — see `policy.py`), not real Apertus 1.5 8B inference or a running `eunomia-server`. The harness, task set, ledger, and metrics code are real and validated; the agent/gate backends are TODO before this table is submission-final (see Section 7).
+> **Harness-validation numbers below, not final submission numbers.** They come from `StubApertusAgent` (a deterministic, documented heuristic — see `agent.py`) and `ScopePolicyGate` (an in-process ABAC stand-in with the same decision logic a live Eunomia `/check` would make — see `policy.py`), not real Apertus 1.5 8B inference or a running `eunomia-server`. The harness, task set, ledger, and metrics code are real and validated; the agent/gate backends are TODO before this table is submission-final (see Section 8).
 
 | Metric | Why it matters | Baseline | Ours |
 |---|---|---|---|
@@ -84,7 +84,7 @@ Every tool-call failure, malformed JSON response, and policy refusal from Apertu
 | Replay fidelity (hash chain verifies) | Proves the audit/non-repudiation claim, not just that logging happened | N/A (no ledger) | 100.0% |
 | Tamper detection on mutated logs (%) — naive tamper (`verify_chain`) | Proves tamper-evidence, not just tamper-logging | N/A (no ledger) | 100.0% |
 | Tamper detection — sophisticated tamper (rewrite + recompute downstream hashes) | `verify_chain()` alone is *fooled* by this; only the ADR-006 WORM cross-check (`verify_against_worm`) still catches it — proven in `tests/test_worm_mirror.py` | N/A | 100.0% (via WORM mirror; 0% via hash chain alone) |
-| Added latency per tool call | The operational cost of the gate — judged under "Value, cost & scalability" | N/A | 0.014 ms (in-process stand-in — **not representative** of a real networked Eunomia `/check` call; re-measure once wired, Section 7) |
+| Added latency per tool call | The operational cost of the gate — judged under "Value, cost & scalability" | N/A | 0.014 ms (in-process stand-in — **not representative** of a real networked Eunomia `/check` call; re-measure once wired, Section 8) |
 
 Confirmed exactly the expected pattern (per mentor feedback): the prompt-only baseline's own alignment catches most (71%) overtly-worded unauthorized requests, but **0% of prompt-injection attempts** — the injected text is written to look like a legitimate system-level authorization, which is precisely what a surface-level, prompt-only policy cannot see through. The gate catches both categories at 100% regardless of how the request was worded, because it checks the actual resource/scope tuple, not the prompt text. Reproduce with `make eval` (dev-stub backends) from `track_2b/`.
 
@@ -97,7 +97,20 @@ Confirmed exactly the expected pattern (per mentor feedback): the prompt-only ba
 - **Crypto-shredding (ADR-005) is schema-correct but only exercised on a synthetic company-UID-as-subject-ID model** — see ADR-005's "what this does NOT do" note: this is not a full GDPR compliance posture (no DPIA, no lawful-basis determination), just the architectural compatibility piece.
 - **Air-gapped claim (Section 2) needs re-verification after every dependency version bump, not just once at the start.**
 
-## 7. Reproducibility
+## 7. Related Work & Differentiation
+
+Raised directly by mentor feedback (Oliver Grognuz, 2026-10-05): is Rütli differentiated from the existing LLM-gateway ecosystem, or does it duplicate functionality already available off-the-shelf — specifically in **LiteLLM**, the most widely-deployed open-source LLM proxy/gateway.
+
+**What LiteLLM already provides:** request-level logging and tracing (Langfuse, Arize Phoenix, LangSmith, OTel v2 — one trace per request spanning the HTTP call, auth, guardrails, the LLM call, and DB/cache work); guardrails (PII masking via Presidio, secret redaction, content moderation, banned keywords, per-key/team enforcement) with "an audit log on every request"; and, on its Enterprise tier, admin-action/key-change audit logs with retention policies, RBAC, and log export to GCS/Azure Blob for compliance storage.
+
+**What it does not provide, as of this writing:**
+- **No tamper-evident or cryptographically verifiable audit trail.** [BerriAI/litellm#29895](https://github.com/BerriAI/litellm/issues/29895) (opened 2026-06-07, still open, no maintainer response or linked PR) requests exactly this — Ed25519-signed, hash-chained post-call receipts for EU AI Act Article 12 compliance — and states plainly that LiteLLM's current logs are "operator-controlled and cannot be independently verified by auditors who don't trust the operator's infrastructure." This is precisely the gap Rütli's hash-chained ledger (ADR-003) plus WORM mirror cross-check (ADR-006) closes: `verify_chain()` catches naive tampering, and `verify_against_worm()` catches the sophisticated tamper that rewrites the chain *and* recomputes every downstream hash — see `tests/test_worm_mirror.py`. Both are built and passing today; LiteLLM's equivalent is an unresolved feature request.
+- **No GDPR/FADP-compliant erasure mechanism for audit logs.** A standard log pipeline has no way to erase one subject's data without either destroying the log's integrity or leaving the personal data in plaintext indefinitely. Rütli's crypto-shredding (ADR-005) destroys a per-subject decryption key, leaving ciphertext in place and the hash chain's integrity untouched — erasure and auditability stop being in tension.
+- **No self-review / reflective improvement layer.** Periodic self-assessment ("did the agent get on well here?", surfaced as human-facing improvement suggestions) appears in the academic LLM-agent literature as a prompting technique (self-reflection on completed trajectories — e.g. Renze & Guven, [arXiv:2405.06682](https://arxiv.org/abs/2405.06682)) but not as a shipped feature of any LLM gateway, LiteLLM included. ADR-007 (proposed) applies this idea to the audit ledger itself: a periodic, human-in-the-loop-only pass that mines the ledger for repeated denials, false-block drift, and retry loops, and appends its own findings back as a first-class auditable event — not a side-channel report.
+
+**The sharpened pitch:** *LiteLLM and comparable gateways give you logs you have to trust the operator on. Rütli gives you a cryptographically verifiable, erasure-compliant, self-assessing audit trail — the actual EU AI Act Article 12 guarantee the LiteLLM community is still asking for as an open feature request.* Rütli is not a gateway competing with LiteLLM's routing/guardrail functionality; it is the governance/audit layer those gateways currently lack, and could in principle sit behind one.
+
+## 8. Reproducibility
 
 - **Hardware:** `TODO — spec the demo machine`
 - **Runtime (harness today):** no Docker needed — `pip install -r requirements.txt` (stdlib + `cryptography` only), then `make test` (23 unit tests, stdlib `unittest`) and `make eval` (runs the dev-stub harness, prints the Section 5 table) from `track_2b/`.
@@ -106,7 +119,7 @@ Confirmed exactly the expected pattern (per mentor feedback): the prompt-only ba
 - **Commit:** `TODO — pin the exact submission commit SHA here on the day of submission`
 - **Dependency pins:** Eunomia Docker image digest (not `latest`), vLLM/llama.cpp version, Apertus GGUF quantisation — all pinned, per the mentor's "write the `make run` target and pin the commit on day 1, not in the last hour" guidance.
 
-## 8. Next steps
+## 9. Next steps
 
 What we would build with another month: the EU AI Act / Swiss FADP automated compliance dossier generator (one-click from the ledger to a human-oversight verification document); the RustFS Object Lock WORM anchor for the sovereign-Swiss-cloud target architecture (ADR-006, Option B — documented, not built this submission); expanding the task set to the full 30-50 target with real Apertus 8B-generated edge cases rather than hand-authored ones; and — if the eval results support it — revisit the Sovereign-Agent-Mesh track (dual-model edge/cloud routing) as a second deployment mode on top of the same ledger, rather than a competing prototype.
 
