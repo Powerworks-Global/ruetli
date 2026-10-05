@@ -13,6 +13,7 @@ All project code lives in [`track_2b/`](track_2b/) per the HackApertus template 
 | | |
 |---|---|
 | **Technical report** | [`track_2b/technical_report.md`](track_2b/technical_report.md) — architecture, evaluation results, limitations, related-work differentiation, reproducibility |
+| **Roadmap** | [`ROADMAP.md`](ROADMAP.md) — Now/Next/Later, scoped to the 2026-10-16 deadline and beyond |
 | **Architecture Decision Records** | [`track_2b/docs/adrs/`](track_2b/docs/adrs/) — see table below |
 | **Eval harness source** | [`track_2b/src/eval/`](track_2b/src/eval/) |
 | **Tests** | [`track_2b/tests/`](track_2b/tests/) — 40 passing, stdlib `unittest`, no `pytest` dependency |
