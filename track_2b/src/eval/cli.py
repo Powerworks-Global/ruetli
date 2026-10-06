@@ -9,18 +9,22 @@ Commands:
                       print its findings (ADR-007). Advisory only — never
                       changes policy/scopes/prompts on its own.
 
-Uses the dev-stub agent and the ScopePolicyGate stand-in for a live
-Eunomia server (see policy.py / agent.py docstrings) — not yet wired to
-real Apertus 1.5 inference or a running eunomia-server instance.
+Uses the dev-stub agent and the ScopePolicyGate stand-in by default (see
+policy.py / agent.py docstrings) — set RUTLI_REAL_BACKENDS=1 to swap in
+OllamaApertusAgent + EunomiaPolicyGate instead, once `ollama serve` has
+the real model and a `eunomia-server` container is running (see those
+modules' docstrings for exact setup). One env var, not a code change,
+so flipping to real submission numbers never requires editing this file.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
-from eval.agent import StubApertusAgent
+from eval.agent import AgentBackend, OllamaApertusAgent, StubApertusAgent
 from eval.ledger import Ledger
 from eval.metrics import (
     compute_condition_metrics,
@@ -28,7 +32,7 @@ from eval.metrics import (
     replay_fidelity,
     tamper_detection_rate,
 )
-from eval.policy import ScopePolicyGate
+from eval.policy import EunomiaPolicyGate, PolicyGate, ScopePolicyGate
 from eval.reflection import format_report, generate_reflection
 from eval.replay import print_timeline
 from eval.runner import run_condition
@@ -41,14 +45,33 @@ REFLECTION_STATE_PATH = TRACK_ROOT / "data" / "reflection_state.json"
 EVAL_RUN_PREFIX = "eval"
 
 
+def _use_real_backends() -> bool:
+    return os.environ.get("RUTLI_REAL_BACKENDS", "").strip() == "1"
+
+
+def _make_agent() -> AgentBackend:
+    if _use_real_backends():
+        return OllamaApertusAgent(
+            model=os.environ.get("RUTLI_OLLAMA_MODEL", "apertus-1.5-8b"),
+            host=os.environ.get("RUTLI_OLLAMA_HOST", "http://localhost:11434"),
+        )
+    return StubApertusAgent()
+
+
+def _make_gate() -> PolicyGate:
+    if _use_real_backends():
+        return EunomiaPolicyGate(base_url=os.environ.get("RUTLI_EUNOMIA_URL", "http://localhost:8421"))
+    return ScopePolicyGate()
+
+
 def cmd_run_eval(_args: argparse.Namespace) -> None:
     tasks = load_tasks(TASKS_PATH)
     ledger = Ledger(LEDGER_PATH)
-    agent = StubApertusAgent()
+    agent = _make_agent()
 
     baseline_run_prefix = EVAL_RUN_PREFIX
     baseline_results = run_condition(ledger, baseline_run_prefix, "baseline", tasks, agent, gate=None)
-    ours_results = run_condition(ledger, baseline_run_prefix, "ours", tasks, agent, gate=ScopePolicyGate())
+    ours_results = run_condition(ledger, baseline_run_prefix, "ours", tasks, agent, gate=_make_gate())
 
     baseline_metrics = compute_condition_metrics(baseline_results)
     ours_metrics = compute_condition_metrics(ours_results)
@@ -59,10 +82,14 @@ def cmd_run_eval(_args: argparse.Namespace) -> None:
     fidelity = replay_fidelity(ledger, all_run_ids)
     tamper_rate = tamper_detection_rate()
 
-    print(
-        "NOTE: dev-stub agent + ScopePolicyGate stand-in — harness-validation numbers, "
-        "NOT final submission numbers (see technical_report.md Section 5).\n"
-    )
+    if _use_real_backends():
+        print("Using REAL backends: OllamaApertusAgent + EunomiaPolicyGate — submission numbers.\n")
+    else:
+        print(
+            "NOTE: dev-stub agent + ScopePolicyGate stand-in — harness-validation numbers, "
+            "NOT final submission numbers (see technical_report.md Section 5). "
+            "Set RUTLI_REAL_BACKENDS=1 once ollama + eunomia-server are running.\n"
+        )
     print(format_markdown_table(baseline_metrics, ours_metrics, fidelity, tamper_rate))
     ledger.close()
 
