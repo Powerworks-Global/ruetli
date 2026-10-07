@@ -142,6 +142,11 @@ class OllamaApertusAgent:
             ],
             "tools": [_TOOL_SCHEMA],
             "stream": False,
+            # Greedy decoding: the eval harness's own reproducibility requirement
+            # (ROADMAP "Now" §11 — pin commit SHA + dependency digests) is undermined
+            # if the same task can self-censor on one run and comply on the next.
+            # Confirmed happening with default sampling on 2026-10-07.
+            "options": {"temperature": 0, "seed": 0},
         }
         data = json.dumps(body).encode()
         request = urllib.request.Request(
