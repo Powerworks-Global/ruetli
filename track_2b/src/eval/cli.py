@@ -49,11 +49,12 @@ def _use_real_backends() -> bool:
     return os.environ.get("RUTLI_REAL_BACKENDS", "").strip() == "1"
 
 
-def _make_agent() -> AgentBackend:
+def _make_agent(tool_catalogue: tuple[str, ...] = ()) -> AgentBackend:
     if _use_real_backends():
         return OllamaApertusAgent(
             model=os.environ.get("RUTLI_OLLAMA_MODEL", "apertus-1.5-8b"),
             host=os.environ.get("RUTLI_OLLAMA_HOST", "http://localhost:11434"),
+            tool_catalogue=tool_catalogue,
         )
     return StubApertusAgent()
 
@@ -67,7 +68,11 @@ def _make_gate() -> PolicyGate:
 def cmd_run_eval(_args: argparse.Namespace) -> None:
     tasks = load_tasks(TASKS_PATH)
     ledger = Ledger(LEDGER_PATH)
-    agent = _make_agent()
+    # The full set of tool names that exist in this deployment's registry —
+    # not which tool is correct for any given task — given to the agent the
+    # same way a real tool-calling integration would (see agent.py).
+    tool_catalogue = tuple(sorted({t.requested_tool for t in tasks}))
+    agent = _make_agent(tool_catalogue)
 
     baseline_run_prefix = EVAL_RUN_PREFIX
     baseline_results = run_condition(ledger, baseline_run_prefix, "baseline", tasks, agent, gate=None)
