@@ -21,6 +21,7 @@ Time-ordered, Now/Next/Later — not a backlog. "Now" is scoped to the 2026-10-1
 
 - **Revisit Sovereign-Agent-Mesh (Project 4)** as a second deployment mode on top of the same ledger, rather than a competing prototype — only if eval results or market signal actually support it. This was deliberately cut from scope on 2026-10-03/04 and confirmed correct by the mentor on 2026-10-05; don't revive it on a hunch.
 - **Powerworks Consulting productization** — this architecture (event-sourced audit ledger + policy gate + crypto-shredding) maps cleanly onto Powerworks's own Technical Audit / DORA / AI Governance consulting practice. Worth a deliberate look post-hackathon, not something to start building mid-submission.
+- **Presidio-style PII masking layer** — considered and deliberately deferred 2026-10-13. Rütli's own differentiation pitch (§7) is "verifiable audit trail behind the gateway," not a gateway competing on guardrails — LiteLLM already does PII masking via Microsoft's Presidio, so building it into Rütli would duplicate that rather than differentiate from it. If built at all, it belongs as a separate layer sitting in front of whatever gateway gets deployed, not inside the ledger/policy-gate core. Revisit only with a real reason, same bar as the Sovereign-Agent-Mesh item above.
 
 ## What this roadmap deliberately leaves out
 
