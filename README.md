@@ -12,11 +12,12 @@ All project code lives in [`track_2b/`](track_2b/) per the HackApertus template 
 
 | | |
 |---|---|
+| **Demo video** | [`track_2b/docs/demo/ruetli-demo.mp4`](track_2b/docs/demo/ruetli-demo.mp4) — 1:52, narrated with Piper TTS, screens from a live `make test`/`make eval`/`make reflect` run |
 | **Technical report** | [`track_2b/technical_report.md`](track_2b/technical_report.md) — architecture, evaluation results, limitations, related-work differentiation, reproducibility |
 | **Roadmap** | [`ROADMAP.md`](ROADMAP.md) — Now/Next/Later, scoped to the 2026-10-16 deadline and beyond |
 | **Architecture Decision Records** | [`track_2b/docs/adrs/`](track_2b/docs/adrs/) — see table below |
 | **Eval harness source** | [`track_2b/src/eval/`](track_2b/src/eval/) |
-| **Tests** | [`track_2b/tests/`](track_2b/tests/) — 40 passing, stdlib `unittest`, no `pytest` dependency |
+| **Tests** | [`track_2b/tests/`](track_2b/tests/) — 53 passing, stdlib `unittest`, no `pytest` dependency |
 
 ## Solution architecture
 

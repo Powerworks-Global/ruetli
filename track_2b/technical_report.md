@@ -6,7 +6,7 @@ numbers say.
 - **Track:** Track 2B — Rütli (Apertus-Auditor)
 - **Event:** Online
 - **Team:** Powerworks — William Power
-- **Demo:** `link to video` _(TODO: record ≤2 min demo before submission)_
+- **Demo:** [`docs/demo/ruetli-demo.mp4`](docs/demo/ruetli-demo.mp4) — 1:52, narrated walkthrough of the real repo, the real `make test` suite, and the real `make eval`/`make reflect` output. How it was made: narration via [Piper TTS](https://github.com/rhasspy/piper) (`en_GB-jenny_dioco-medium` voice, fully offline, no cloud TTS account), screens captured from real GitHub pages and live terminal output via headless Chromium, assembled scene-by-scene with `ffmpeg` (`libopenh264` encoder). Nothing in the recording is staged — the test/eval/reflect output is a live run against a fresh clone, not a mockup.
 
 ## 1. Summary
 
