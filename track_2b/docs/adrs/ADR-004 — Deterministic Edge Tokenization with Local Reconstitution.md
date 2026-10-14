@@ -96,6 +96,6 @@ If CSCS deploys confidential computing nodes (e.g. AMD SEV-SNP or NVIDIA H100 Co
 ---
 
 ## Related Documents
-- [[ADR-001 — Decoupled Policy Engine over Synchronous Proxy]]
-- [[ADR-002 — Agent Passport Schema & Cantonal Jurisdiction Claims]]
-- [[Swiss AI Hackathon — Apertus]]
+- [ADR-001: Decoupled Policy Engine over Synchronous Proxy](ADR-001%20%E2%80%94%20Decoupled%20Policy%20Engine%20over%20Synchronous%20Proxy.md)
+- [ADR-002: Agent Passport Schema & Cantonal Jurisdiction Claims](ADR-002%20%E2%80%94%20Agent%20Passport%20Schema%20%26%20Cantonal%20Jurisdiction%20Claims.md)
+- [Rütli Overview](../../README.md)

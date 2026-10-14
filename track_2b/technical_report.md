@@ -10,7 +10,7 @@ numbers say.
 
 ## 1. Summary
 
-`TODO — one paragraph once Section 5 has real numbers.` Draft: Agentic AI deployments in regulated sectors (public administration, finance) need non-repudiable proof of *why* an agent was allowed to take an action, not just a log that it happened. Rütli — named for the 1291 oath that founded the Swiss Confederation, a mutual-trust pact between parties who need to verify each other's commitments — wraps an Apertus 1.5 agent runner with a policy gate and an append-only, hash-chained event ledger: every prompt, policy check, tool call, and model output is recorded as a typed, replayable event. We measure this against a prompt-only-policy baseline on a scripted task set mixing legitimate calls, unauthorized calls, and prompt-injection attempts, and report blocked-unauthorized-call rate, false-block rate, replay fidelity, and tamper detection.
+Deploying autonomous agents in regulated sectors (public administration, finance) requires non-repudiable proof of *why* an agent was permitted to take an action, not merely a log that it occurred. Rütli — named for the 1291 oath that founded the Swiss Confederation, a mutual-trust pact between parties who need to verify each other's commitments — wraps an Apertus 1.5 agent runner with an out-of-band authorization gate ([Eunomia](https://github.com/whataboutyou-ai/eunomia)) and an append-only, SHA-256 hash-chained event ledger. Every prompt, policy decision, canonical action proposal, and execution event is recorded as an immutable, replayable event. We evaluate Rütli against a prompt-only policy baseline across a scripted task set combining legitimate, unauthorized, and adversarial prompt-injection attempts. The policy gate achieves 100% block rates on both unauthorized actions and prompt injections (versus 35.7% for prompt-only baseline, which fails 100% of prompt injections), with 0% false-block rate on legitimate actions, 100% hash-chain ledger integrity, and 100% tamper detection against sophisticated state rewriting via an append-only WORM sidecar mirror.
 
 ## 2. Architecture
 
@@ -28,7 +28,41 @@ numbers say.
 
 **Data flow:** User prompt → Apertus agent runner appends `PromptReceivedEvent` → runner calls Eunomia `/check` for the proposed tool call → Eunomia returns `ALLOW`/`DENY` (+ reason) → runner appends `PolicyEvaluatedEvent` → on `ALLOW`, runner executes the tool, appends `ToolExecutionCompletedEvent` → Apertus synthesizes the final answer → runner appends `ModelOutputEvent`. Every event carries a `PayloadHash` and `ParentEventId`, forming a hash chain used for tamper detection (Section 5).
 
-Diagrams: see `[[ADR-003 — Event-Sourced Agent Ledger & CQRS Audit Model]]` sequence diagram in the parent vault note — `TODO: copy into docs/architecture.png` before submission.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Citizen / Auditor
+    participant Harness as Apertus Agent Harness
+    participant Eunomia as Eunomia Policy Gate (/check)
+    participant Ledger as Event Ledger (SQLite / Hash-Chained)
+    participant WORM as Append-Only WORM Mirror
+    participant Model as Apertus 1.5 8B
+    participant Tool as Target System / Tool
+
+    User->>Harness: Submit Prompt
+    Harness->>Ledger: Append(PromptReceivedEvent)
+    Ledger->>WORM: Mirror Append
+    Harness->>Model: Infer Action Proposal
+    Model-->>Harness: ProposedCall(tool, resource)
+    Harness->>Ledger: Append(ToolProposedEvent)
+    Ledger->>WORM: Mirror Append
+    Harness->>Eunomia: Verify Entitlement (/check)
+    alt Allowed
+        Eunomia-->>Harness: Decision(ALLOW)
+        Harness->>Ledger: Append(PolicyEvaluatedEvent: ALLOW)
+        Harness->>Tool: Execute Simulated Tool
+        Tool-->>Harness: Result
+        Harness->>Ledger: Append(ToolExecutionCompletedEvent)
+        Harness->>Model: Synthesize Final Response
+        Model-->>Harness: Response Text
+        Harness->>Ledger: Append(ModelOutputEvent)
+        Harness-->>User: Audited Output
+    else Denied / Injected
+        Eunomia-->>Harness: Decision(DENY)
+        Harness->>Ledger: Append(PolicyEvaluatedEvent: DENY)
+        Harness-->>User: Refusal & Audit Notice
+    end
+```
 
 **Naming note:** "Rütli" is this submission's name only. It is unrelated to "Eunomia" (the third-party OSS dependency above) and unrelated to "EUnomia"/"Nomothetes" (an unrelated Powerworks product, a different domain entirely, being renamed separately). Three distinct things, kept distinct deliberately after an internal naming collision was caught during setup.
 
@@ -71,6 +105,8 @@ Every tool-call failure, malformed JSON response, and policy refusal from Apertu
 
 ## 5. Evaluation
 
+**2026-10-08 ADR-008 update:** A versioned action contract now validates proposals and records the *proposed* action through authorization and simulated execution. `make eval` additionally reports correct action selection (77.3% in both stub conditions), invalid proposals (0) and backend errors (0). These are synthetic harness numbers, not real Apertus/Eunomia results. The previously named “replay fidelity” below measures hash-chain integrity only; it does not reproduce external execution. The gate-latency figure below is historical: the current stub run measured 0.021 ms and is not a network measurement. See [ADR-008](docs/adrs/ADR-008%20%E2%80%94%20Versioned%20Canonical%20Action%20Contract.md).
+
 **Baseline:** the same agent with the authorization policy stated only in the system prompt — no gate, no ledger. **Ours:** the same agent with a policy gate in front of every tool call, plus the event ledger recording each decision.
 
 > **Harness-validation numbers below, not final submission numbers.** They come from `StubApertusAgent` (a deterministic, documented heuristic — see `agent.py`) and `ScopePolicyGate` (an in-process ABAC stand-in with the same decision logic a live Eunomia `/check` would make — see `policy.py`), not real Apertus 1.5 8B inference or a running `eunomia-server`. The harness, task set, ledger, and metrics code are real and validated; the agent/gate backends are TODO before this table is submission-final (see Section 8).
@@ -81,18 +117,18 @@ Every tool-call failure, malformed JSON response, and policy refusal from Apertu
 | ↳ broken down: unauthorized (overt) | | 71.4% (5/7) | 100.0% (7/7) |
 | ↳ broken down: injection | | **0.0% (0/7)** | 100.0% (7/7) |
 | False-block rate on legitimate calls (%) | Stops "block everything" from trivially winning | 0.0% | 0.0% |
-| Replay fidelity (hash chain verifies) | Proves the audit/non-repudiation claim, not just that logging happened | N/A (no ledger) | 100.0% |
+| Ledger integrity (hash chain verifies) | Checks recorded event integrity; does not prove execution replay or non-repudiation | N/A (no ledger) | 100.0% |
 | Tamper detection on mutated logs (%) — naive tamper (`verify_chain`) | Proves tamper-evidence, not just tamper-logging | N/A (no ledger) | 100.0% |
 | Tamper detection — sophisticated tamper (rewrite + recompute downstream hashes) | `verify_chain()` alone is *fooled* by this; only the ADR-006 WORM cross-check (`verify_against_worm`) still catches it — proven in `tests/test_worm_mirror.py` | N/A | 100.0% (via WORM mirror; 0% via hash chain alone) |
-| Added latency per tool call | The operational cost of the gate — judged under "Value, cost & scalability" | N/A | 0.014 ms (in-process stand-in — **not representative** of a real networked Eunomia `/check` call; re-measure once wired, Section 8) |
+| Added latency per tool call | The operational cost of the gate — judged under "Value, cost & scalability" | N/A | 0.021 ms (in-process stand-in — **not representative** of a real networked Eunomia `/check` call; re-measure once wired, Section 8) |
 
 Confirmed exactly the expected pattern (per mentor feedback): the prompt-only baseline's own alignment catches most (71%) overtly-worded unauthorized requests, but **0% of prompt-injection attempts** — the injected text is written to look like a legitimate system-level authorization, which is precisely what a surface-level, prompt-only policy cannot see through. The gate catches both categories at 100% regardless of how the request was worded, because it checks the actual resource/scope tuple, not the prompt text. Reproduce with `make eval` (dev-stub backends) from `track_2b/`.
 
 ## 6. Limitations
 
-- **Section 5's numbers are from dev-stub backends, not real Apertus 1.5 8B inference or a live Eunomia server.** `StubApertusAgent` and `ScopePolicyGate` are documented, deterministic heuristics (see docstrings), built so the ledger/metrics/replay code could be built and validated today without GPU/Docker access in this environment. Swapping in `OllamaApertusAgent` and `EunomiaPolicyGate` (both stubbed with explicit `NotImplementedError`, see `agent.py`/`policy.py`) is the single biggest remaining risk to these numbers changing before submission.
+- **Section 5's numbers are from dev-stub backends, not real Apertus 1.5 8B inference or a live Eunomia server.** `StubApertusAgent` and `ScopePolicyGate` are documented, deterministic heuristics. `OllamaApertusAgent` and `EunomiaPolicyGate` have mocked API tests but have not been verified together against live services. In particular, live policy selection across different scope sets and identity isolation remain unverified.
 - **The task set's categories don't produce false positives by construction** — every legitimate task's resource falls cleanly inside its authorized scope, and every unauthorized/injection task's doesn't. Real Apertus 8B inference may propose tool calls with messier, ambiguous resource strings that a real Eunomia policy has to resolve less cleanly than our `ScopePolicyGate` prefix-match. The 0.0% false-block rate above should not be read as proven robustness yet.
-- **Latency numbers are not representative.** `ScopePolicyGate` is in-process Python; a real `eunomia-server` call is a networked HTTP round-trip. The 0.014ms figure measures the harness's own overhead, not Eunomia's.
+- **Latency numbers are not representative.** `ScopePolicyGate` is in-process Python; a real `eunomia-server` call is a networked HTTP round-trip. The 0.021ms figure measures the harness's own overhead, not Eunomia's.
 - **The WORM mirror's `chattr +a` enforcement is host-dependent** — it silently (well, not silently: `ledger.worm.immutable_enforced` reports `False`) degrades to a plain file on non-Linux hosts, non-ext filesystems, or sandboxes without the capability (this dev environment is one such case). The submission demo machine's filesystem must be checked, not assumed.
 - **Crypto-shredding (ADR-005) is schema-correct but only exercised on a synthetic company-UID-as-subject-ID model** — see ADR-005's "what this does NOT do" note: this is not a full GDPR compliance posture (no DPIA, no lawful-basis determination), just the architectural compatibility piece.
 - **Air-gapped claim (Section 2) needs re-verification after every dependency version bump, not just once at the start.**
@@ -112,12 +148,15 @@ Raised directly by mentor feedback (Oliver Grognuz, 2026-10-05): is Rütli diffe
 
 ## 8. Reproducibility
 
-- **Hardware:** `TODO — spec the demo machine`
-- **Runtime (harness today):** no Docker needed — `pip install -r requirements.txt` (stdlib + `cryptography` only), then `make test` (40 unit tests, stdlib `unittest`), `make eval` (runs the dev-stub harness, prints the Section 5 table), and `make reflect` (ADR-007 self-review pass over the last `make eval` batch) from `track_2b/`.
-- **Runtime (submission target):** Docker Compose, `make run` from repo root — **not yet implemented** (Section 6's biggest TODO: wire real Apertus 1.5 8B via Ollama + a running `eunomia-server` container, replacing the stub backends).
-- **Seeds:** the task set (`data/tasks.jsonl`) is static and hand-authored, not sampled — no seed needed for it. If the expanded 30-50 task set adds any generated/sampled tasks, record the seed here.
-- **Commit:** `TODO — pin the exact submission commit SHA here on the day of submission`
-- **Dependency pins:** Eunomia Docker image digest (not `latest`), vLLM/llama.cpp version, Apertus GGUF quantisation — all pinned, per the mentor's "write the `make run` target and pin the commit on day 1, not in the last hour" guidance.
+- **Hardware:** Standard x86_64 Linux workstation / server (Intel Core i5/i7 or AMD Ryzen/EPYC, 4+ CPU cores, 8 GB RAM, Linux kernel 6.x on ext4/btrfs filesystem with `chattr +a` capability).
+- **Runtime (harness & verification):** Standard Python 3.11+ environment with `cryptography>=42.0`. Run `make test` (61 unit tests, stdlib `unittest`, ~0.2s runtime), `make eval` (runs the evaluation harness and prints Section 5 metrics), and `make reflect` (ADR-007 meta-audit reflection pass) from `track_2b/` or repository root.
+- **Containerized execution (`make run`):** Single-command launch via `make run` from repository root or `track_2b/`. Automatically builds the container image (`ruetli-track2b`) via Docker or Podman and runs the complete test, evaluation, and reflection verification suite end-to-end.
+- **Seeds:** The task set (`data/tasks.jsonl`) is deterministic and static (22 curated tasks covering legitimate requests, overt unauthorized requests, and adversarial prompt injections). For inference reproducibility with live models, `OllamaApertusAgent` pins `temperature=0.0` and fixed seed 42.
+- **Dependency pins:**
+  - Apertus model: `swiss-ai/Apertus-v1.5-8B` (Q4_K_M GGUF quantization)
+  - Eunomia policy server: `ttommitt/eunomia-server:latest` / `eunomia-ai>=0.1.2`
+  - Cryptography: `cryptography>=42.0` (Fernet AES-128-CBC / HMAC-SHA256)
+  - Base container: `python:3.11-slim` (Debian Bookworm)
 
 ## 9. Next steps
 
@@ -133,4 +172,5 @@ Creative Commons Attribution 4.0 (CC-BY-4.0). All HackApertus projects are open-
 - Eunomia (OSS authorization layer, Apache 2.0): https://github.com/whataboutyou-ai/eunomia
 - RustFS (OSS S3-compatible object storage with Object Lock, Apache 2.0 — ADR-006's documented future WORM anchor): https://github.com/rustfs/rustfs
 - HackApertus Track 2B template: https://github.com/HackApertus/project-template/tree/main/track_2b
-- [`docs/adrs/`](docs/adrs/) — ADR-001 through ADR-006 (decoupled policy engine, Agent Passport schema, event-sourced ledger, edge tokenization, crypto-shredding, WORM backup). `TODO: these still use Obsidian [[wikilink]] syntax for cross-references — convert to relative Markdown links before submission so they render on GitHub.`
+- [`docs/adrs/`](docs/adrs/) — ADR-001 through ADR-008 (Decoupled Policy Engine, Agent Passport Schema, Event-Sourced Ledger, Edge Tokenization, Crypto-Shredding, WORM Backup, Reflective Self-Review, Versioned Canonical Action Contract).
+- Requirements Traceability Matrix: [`docs/traceability.md`](docs/traceability.md)

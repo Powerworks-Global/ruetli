@@ -79,8 +79,8 @@ If judging feedback or the entry-guide re-read (outstanding as of this ADR) reve
 ---
 
 ## Related Documents
-- [[ADR-003 — Event-Sourced Agent Ledger & CQRS Audit Model]]
-- [[ADR-006 — Hackproof WORM Backup for the Event Ledger]]
-- [[Swiss AI Hackathon — Apertus]]
-- `Active_Projects/Swiss AI Hackathon — Apertus/Meetings/2026-10-05 — Call with Oliver Grognuz (Apertus Mentor).md` (source of this ADR's requirement)
-- LiteLLM differentiation check — still outstanding, see mentor-call meeting note follow-ups
+- [ADR-003: Event-Sourced Agent Ledger & CQRS Audit Model](ADR-003%20%E2%80%94%20Event-Sourced%20Agent%20Ledger%20%26%20CQRS%20Audit%20Model.md)
+- [ADR-006: Hackproof WORM Backup for the Event Ledger](ADR-006%20%E2%80%94%20Hackproof%20WORM%20Backup%20for%20the%20Event%20Ledger.md)
+- [ADR-008: Versioned Canonical Action Contract](ADR-008%20%E2%80%94%20Versioned%20Canonical%20Action%20Contract.md)
+- [Rütli Overview](../../README.md)
+- LiteLLM differentiation analysis: [`technical_report.md` §7](../../technical_report.md#7-related-work--differentiation)

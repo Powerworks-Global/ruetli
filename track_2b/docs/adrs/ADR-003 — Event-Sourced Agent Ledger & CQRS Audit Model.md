@@ -97,7 +97,7 @@ Every event $E_n$ stores:
 $$\text{hash}_n = \text{SHA256}(\text{hash}_{n-1} + E_n.\text{payload} + E_n.\text{timestamp})$$
 An auditor verifies the integrity of an entire session by validating the chain from the genesis event to the final completed event. Any tampering in the storage layer immediately breaks the cryptographic chain.
 
-> **Amendment, 2026-10-04 (see [[ADR-005 — Crypto-Shredding for GDPR & FADP Erasure Compatibility]]):** this hash chain is computed over the *stored* payload. For personal-data fields, the stored payload is ciphertext, not plaintext — so a GDPR/FADP erasure request can destroy the decryption key without ever touching a hashed event, leaving this chain's integrity unaffected by erasure.
+> **Amendment, 2026-10-04 (see [ADR-005: Crypto-Shredding for GDPR & FADP Erasure Compatibility](ADR-005%20%E2%80%94%20Crypto-Shredding%20for%20GDPR%20%26%20FADP%20Erasure%20Compatibility.md)):** this hash chain is computed over the *stored* payload. For personal-data fields, the stored payload is ciphertext, not plaintext — so a GDPR/FADP erasure request can destroy the decryption key without ever touching a hashed event, leaving this chain's integrity unaffected by erasure.
 
 ---
 
@@ -108,7 +108,9 @@ If ultra-low latency constraints (< 5ms end-to-end per turn) make synchronous di
 ---
 
 ## Related Documents
-- [[ADR-001 — Decoupled Policy Engine over Synchronous Proxy]]
-- [[ADR-002 — Agent Passport Schema & Cantonal Jurisdiction Claims]]
-- [[ADR-005 — Crypto-Shredding for GDPR & FADP Erasure Compatibility]]
-- [[Templates/spec-by-example|Specification by Example Template]]
+- [ADR-001: Decoupled Policy Engine over Synchronous Proxy](ADR-001%20%E2%80%94%20Decoupled%20Policy%20Engine%20over%20Synchronous%20Proxy.md)
+- [ADR-002: Agent Passport Schema & Cantonal Jurisdiction Claims](ADR-002%20%E2%80%94%20Agent%20Passport%20Schema%20%26%20Cantonal%20Jurisdiction%20Claims.md)
+- [ADR-005: Crypto-Shredding for GDPR & FADP Erasure Compatibility](ADR-005%20%E2%80%94%20Crypto-Shredding%20for%20GDPR%20%26%20FADP%20Erasure%20Compatibility.md)
+- [ADR-006: Hackproof WORM Backup for the Event Ledger](ADR-006%20%E2%80%94%20Hackproof%20WORM%20Backup%20for%20the%20Event%20Ledger.md)
+- [ADR-007: Human-in-the-Loop Reflective Self-Review Layer](ADR-007%20%E2%80%94%20Human-in-the-Loop%20Reflective%20Self-Review%20Layer.md)
+- [ADR-008: Versioned Canonical Action Contract](ADR-008%20%E2%80%94%20Versioned%20Canonical%20Action%20Contract.md)

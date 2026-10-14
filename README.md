@@ -17,7 +17,7 @@ All project code lives in [`track_2b/`](track_2b/) per the HackApertus template 
 | **Roadmap** | [`ROADMAP.md`](ROADMAP.md) — Now/Next/Later, scoped to the 2026-10-16 deadline and beyond |
 | **Architecture Decision Records** | [`track_2b/docs/adrs/`](track_2b/docs/adrs/) — see table below |
 | **Eval harness source** | [`track_2b/src/eval/`](track_2b/src/eval/) |
-| **Tests** | [`track_2b/tests/`](track_2b/tests/) — 53 passing, stdlib `unittest`, no `pytest` dependency |
+| **Tests** | [`track_2b/tests/`](track_2b/tests/) — 61 passing, stdlib `unittest`, no `pytest` dependency |
 
 ## Solution architecture
 
@@ -47,10 +47,13 @@ All project code lives in [`track_2b/`](track_2b/) per the HackApertus template 
 | [005](track_2b/docs/adrs/ADR-005%20%E2%80%94%20Crypto-Shredding%20for%20GDPR%20%26%20FADP%20Erasure%20Compatibility.md) | Crypto-shredding for GDPR/FADP-compliant erasure without breaking the hash chain | Accepted |
 | [006](track_2b/docs/adrs/ADR-006%20%E2%80%94%20Hackproof%20WORM%20Backup%20for%20the%20Event%20Ledger.md) | Local append-only WORM mirror now; RustFS Object Lock anchor documented as the stronger sovereign-cloud mode, not built this submission | Accepted |
 | [007](track_2b/docs/adrs/ADR-007%20%E2%80%94%20Human-in-the-Loop%20Reflective%20Self-Review%20Layer.md) | Periodic, advisory-only self-review layer mining the ledger for improvement signals, designed to be fully deletable with no changes to the core ledger/policy/runner modules | Accepted, implemented |
+| [008](track_2b/docs/adrs/ADR-008%20%E2%80%94%20Versioned%20Canonical%20Action%20Contract.md) | Validate and preserve one canonical action through authorization and audit; separate selection errors from policy denials | Accepted, implemented in evaluation harness |
 
 ## Evaluation
 
 Baseline (prompt-only policy) vs. Rütli (Eunomia-gated), over a scripted task set mixing legitimate, unauthorized, and prompt-injection attempts. Full methodology, honest caveats about what's dev-stub-backend vs. real, and the related-work differentiation against LiteLLM: [`technical_report.md` §5–7](track_2b/technical_report.md#5-evaluation).
+
+**ADR-008 update:** the harness now validates model proposals against a versioned tool/action registry, checks and records that same action, and labels execution `simulated`. It reports selection correctness, invalid proposals and backend errors separately. Hash-chain verification is **ledger integrity**, not deterministic replay of external actions. The technical report's earlier metric table predates this change; regenerate with `make eval` before citing results. A live Eunomia server and actual Apertus inference still require integration verification; evaluation fixture scopes are not authenticated production identities.
 
 ```bash
 cd track_2b
@@ -62,7 +65,7 @@ make reflect    # ADR-007 self-review pass over the last eval batch — advisory
 
 ```bash
 cd track_2b
-make test       # 40 tests, stdlib unittest, no pytest dependency
+make test       # stdlib unittest, no pytest dependency
 ```
 
 Covers the ledger's hash-chain tamper detection, the WORM mirror's defense against a *sophisticated* tamper (one that rewrites the chain and recomputes every downstream hash consistently), crypto-shredding erasure semantics, policy gate scope matching, and the reflection layer's leak/drift/latency-outlier detection.
@@ -74,7 +77,7 @@ Honest status as of this submission, not aspirational:
 - **Linting/formatting:** not yet wired into CI. The codebase follows a consistent style by hand (docstring-first, `from __future__ import annotations`, dataclasses for value types) but nothing enforces it automatically yet. **TODO** before submission if time allows: `ruff check` + `ruff format` as a pre-commit hook or CI step.
 - **Dependency vulnerability scanning:** not yet run. The only third-party runtime dependency is `cryptography>=42.0` ([`requirements.txt`](track_2b/requirements.txt)) — deliberately minimal attack surface by design, but not yet verified with a scanner. **TODO:** `pip-audit` (or GitHub's own Dependabot alerts, since the repo is public) before submission.
 - **SBOM:** not yet generated. **TODO:** `cyclonedx-bom` or `syft` can generate one in minutes given the small dependency surface — worth doing once `eunomia`/Apertus runtime dependencies are pinned (see the reproducibility TODOs in `technical_report.md` §8), since the SBOM should reflect the real submission's dependency set, not the dev-stub harness's.
-- **What *is* enforced today:** the 40-test suite above, run on every `make test` invocation, and the ledger's own cryptographic self-checks (`verify_chain`, `verify_against_worm`) — which are closer to a runtime integrity guarantee than code-quality tooling, and arguably the more load-bearing of the two for this project's actual claim.
+- **What *is* enforced today:** the 61-test suite above, run on every `make test` invocation, and the ledger's own cryptographic self-checks (`verify_chain`, `verify_against_worm`) — which are closer to a runtime integrity guarantee than code-quality tooling, and arguably the more load-bearing of the two for this project's actual claim.
 
 ## License
 

@@ -25,11 +25,12 @@ import sys
 from pathlib import Path
 
 from eval.agent import AgentBackend, OllamaApertusAgent, StubApertusAgent
+from eval.actions import TOOLS
 from eval.ledger import Ledger
 from eval.metrics import (
     compute_condition_metrics,
     format_markdown_table,
-    replay_fidelity,
+    ledger_integrity,
     tamper_detection_rate,
 )
 from eval.policy import EunomiaPolicyGate, PolicyGate, ScopePolicyGate
@@ -71,7 +72,7 @@ def cmd_run_eval(_args: argparse.Namespace) -> None:
     # The full set of tool names that exist in this deployment's registry —
     # not which tool is correct for any given task — given to the agent the
     # same way a real tool-calling integration would (see agent.py).
-    tool_catalogue = tuple(sorted({t.requested_tool for t in tasks}))
+    tool_catalogue = tuple(sorted(TOOLS))
     agent = _make_agent(tool_catalogue)
 
     baseline_run_prefix = EVAL_RUN_PREFIX
@@ -84,7 +85,7 @@ def cmd_run_eval(_args: argparse.Namespace) -> None:
     all_run_ids = [f"{baseline_run_prefix}-baseline-{t.task_id}" for t in tasks] + [
         f"{baseline_run_prefix}-ours-{t.task_id}" for t in tasks
     ]
-    fidelity = replay_fidelity(ledger, all_run_ids)
+    fidelity = ledger_integrity(ledger, all_run_ids)
     tamper_rate = tamper_detection_rate()
 
     if _use_real_backends():

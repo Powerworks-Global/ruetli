@@ -106,6 +106,6 @@ If the Swiss Federal Administration establishes an official electronic identity 
 ---
 
 ## Related Documents
-- [[ADR-001 — Decoupled Policy Engine over Synchronous Proxy]]
-- [[ADR-003 — Event-Sourced Agent Ledger & CQRS Audit Model]]
-- [[ADR-004 — Deterministic Edge Tokenization with Local Reconstitution]]
+- [ADR-001: Decoupled Policy Engine over Synchronous Proxy](ADR-001%20%E2%80%94%20Decoupled%20Policy%20Engine%20over%20Synchronous%20Proxy.md)
+- [ADR-003: Event-Sourced Agent Ledger & CQRS Audit Model](ADR-003%20%E2%80%94%20Event-Sourced%20Agent%20Ledger%20%26%20CQRS%20Audit%20Model.md)
+- [ADR-004: Deterministic Edge Tokenization with Local Reconstitution](ADR-004%20%E2%80%94%20Deterministic%20Edge%20Tokenization%20with%20Local%20Reconstitution.md)

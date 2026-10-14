@@ -36,6 +36,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Protocol
 
+from eval.actions import Action
+
 
 @dataclass(frozen=True)
 class PolicyDecision:
@@ -44,7 +46,7 @@ class PolicyDecision:
 
 
 class PolicyGate(Protocol):
-    def check(self, requested_resource: str, authorized_scopes: tuple[str, ...]) -> PolicyDecision:
+    def check(self, requested_resource: str, authorized_scopes: tuple[str, ...], action: Action | None = None) -> PolicyDecision:
         ...
 
 
@@ -52,7 +54,7 @@ class NullPolicyGate:
     """The baseline: always allows. Matches a system where authorization
     is only ever a sentence in the system prompt, never enforced."""
 
-    def check(self, requested_resource: str, authorized_scopes: tuple[str, ...]) -> PolicyDecision:
+    def check(self, requested_resource: str, authorized_scopes: tuple[str, ...], action: Action | None = None) -> PolicyDecision:
         return PolicyDecision(allowed=True, reason="no gate — baseline has no enforcement")
 
 
@@ -66,7 +68,13 @@ class ScopePolicyGate:
     """Deterministic ABAC stand-in for a live Eunomia server: allow iff the
     requested resource falls under one of the caller's authorized scopes."""
 
-    def check(self, requested_resource: str, authorized_scopes: tuple[str, ...]) -> PolicyDecision:
+    def check(self, requested_resource: str, authorized_scopes: tuple[str, ...], action: Action | None = None) -> PolicyDecision:
+        if action is not None and action.resource != requested_resource:
+            return PolicyDecision(False, "action/resource mismatch")
+        if action is not None and action.operation != "read":
+            return PolicyDecision(False, "non-read operations require explicit operation grants")
+        if action is not None and not any(scope.startswith(action.namespace + ":") for scope in authorized_scopes):
+            return PolicyDecision(False, "tool namespace not granted")
         for scope in authorized_scopes:
             if _scope_matches(requested_resource, scope):
                 return PolicyDecision(allowed=True, reason=f"matched scope '{scope}'")
@@ -143,7 +151,10 @@ class EunomiaPolicyGate:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 return json.loads(response.read().decode())
         except urllib.error.HTTPError as e:
-            return {"_http_error": e.code, "_body": e.read().decode()}
+            try:
+                return {"_http_error": e.code, "_body": e.read().decode()}
+            finally:
+                e.close()
 
     def _ensure_policy_registered(self, authorized_scopes: tuple[str, ...]) -> str:
         name = _policy_name_for(authorized_scopes)
@@ -154,18 +165,21 @@ class EunomiaPolicyGate:
             rules.extend(_rules_for_scope(scope))
         policy = {"version": "1.0", "name": name, "default_effect": "deny", "rules": rules}
         result = self._post("/admin/policies", policy)
-        # A 409/400 here means another task in this same run (or a prior
-        # run) already registered this exact scope-set's policy - not a
-        # real failure, the policy existing is exactly what we want.
-        if "_http_error" in result and result["_http_error"] not in (400, 409):
+        # Only a specific 409 duplicate-policy response can be tolerated.
+        # Live-server policy selection/isolation still requires integration verification.
+        if "_http_error" in result and (result["_http_error"] != 409 or "already exist" not in result["_body"].lower()):
             raise RuntimeError(f"EunomiaPolicyGate: failed to register policy {name!r}: {result}")
         self._registered_policies.add(name)
         return name
 
-    def check(self, requested_resource: str, authorized_scopes: tuple[str, ...]) -> PolicyDecision:
+    def check(self, requested_resource: str, authorized_scopes: tuple[str, ...], action: Action | None = None) -> PolicyDecision:
+        if action is not None:
+            local = ScopePolicyGate().check(requested_resource, authorized_scopes, action)
+            if not local.allowed:
+                return local
         if not authorized_scopes:
             return PolicyDecision(allowed=False, reason="no authorized scopes - nothing to register or match against")
-        self._ensure_policy_registered(authorized_scopes)
+        name = self._ensure_policy_registered(authorized_scopes)
         result = self._post(
             "/check",
             {
@@ -176,4 +190,6 @@ class EunomiaPolicyGate:
         )
         if "_http_error" in result:
             raise RuntimeError(f"EunomiaPolicyGate: /check failed: {result}")
-        return PolicyDecision(allowed=bool(result.get("allowed")), reason=result.get("reason", "<no reason returned>"))
+        if not isinstance(result.get("allowed"), bool):
+            raise RuntimeError(f"EunomiaPolicyGate: malformed /check response for {name}")
+        return PolicyDecision(allowed=result["allowed"], reason=result.get("reason", "<no reason returned>"))

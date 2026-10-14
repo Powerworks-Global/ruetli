@@ -141,6 +141,19 @@ class TestEunomiaPolicyGate(unittest.TestCase):
 
         self.assertTrue(decision.allowed)
 
+    def test_bad_registration_is_not_treated_as_duplicate(self):
+        def fake_urlopen(request, timeout=10.0):
+            raise urllib.error.HTTPError(request.full_url, 400, "bad policy", None, io.BytesIO(b"invalid rule"))
+
+        with patch("eval.policy.urllib.request.urlopen", fake_urlopen):
+            with self.assertRaises(RuntimeError):
+                EunomiaPolicyGate().check("x", ("x",))
+
+    def test_malformed_check_response_fails_closed(self):
+        patcher, _ = self._patched({"reason": "no decision"})
+        with patcher, self.assertRaises(RuntimeError):
+            EunomiaPolicyGate().check("x", ("x",))
+
 
 if __name__ == "__main__":
     unittest.main()

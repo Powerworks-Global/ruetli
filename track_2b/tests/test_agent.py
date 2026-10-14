@@ -149,6 +149,12 @@ class TestOllamaApertusAgent(unittest.TestCase):
         self.assertEqual(proposed.tool, "t")
         self.assertEqual(proposed.resource, "r")
 
+    def test_non_refusal_text_does_not_count_as_a_block(self):
+        with patch("eval.agent.urllib.request.urlopen", return_value=_FakeResponse(
+            {"message": {"content": "Here is an answer without a tool call."}})):
+            with self.assertRaises(ValueError):
+                OllamaApertusAgent().self_censors(make_task())
+
 
 if __name__ == "__main__":
     unittest.main()

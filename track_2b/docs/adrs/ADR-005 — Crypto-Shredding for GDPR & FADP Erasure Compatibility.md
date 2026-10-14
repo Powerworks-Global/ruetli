@@ -9,7 +9,7 @@
 
 ## Context
 
-[[ADR-003 — Event-Sourced Agent Ledger & CQRS Audit Model]] commits to an append-only, SHA-256 hash-chained event ledger specifically because immutability is what makes the audit trail non-repudiable: mutating any stored event breaks the hash chain for every event after it, so tampering is mathematically detectable.
+[ADR-003: Event-Sourced Agent Ledger & CQRS Audit Model](ADR-003%20%E2%80%94%20Event-Sourced%20Agent%20Ledger%20%26%20CQRS%20Audit%20Model.md) commits to an append-only, SHA-256 hash-chained event ledger specifically because immutability is what makes the audit trail non-repudiable: mutating any stored event breaks the hash chain for every event after it, so tampering is mathematically detectable.
 
 That same immutability conflicts with **GDPR Article 17** and the **Swiss FADP**'s equivalent erasure right whenever a ledger event contains personal data about an identifiable natural person (a citizen name, an AHV/AVS number, an IBAN tied to an individual, or — more subtly — a cantonal company UID that resolves to a sole proprietor). A data subject's erasure request cannot be honored by deleting or editing the event, because that is precisely the operation the hash chain is designed to make either impossible or detectable.
 
@@ -22,7 +22,7 @@ This submission's own evaluation data is synthetic only (see `technical_report.m
 - **GDPR Art. 17 / FADP erasure rights** are not negotiable away by an architecture choice — when they apply, they override pure immutability for the personal-data fields specifically, not for the ledger as a whole.
 - **ADR-003's non-repudiation guarantee must survive erasure.** Honoring an erasure request for one data subject must not be able to invalidate the hash chain, or weaken the audit trail, for events belonging to any other subject or to no subject at all.
 - **Most ledger content is not personal data.** Policy decisions, tool names, scope checks, and timing metadata describe the *agent's* behavior, not a data subject. Erasure should be scoped to the specific fields that are personal data, not to whole events.
-- **Reuses existing vocabulary.** [[ADR-004 — Deterministic Edge Tokenization with Local Reconstitution]] already defines a typed-entity classification (`CHE_PERSON`, `CHE_AHV`, `CHE_IBAN`, `CHE_CANTONAL_ID`) for exactly this kind of field. A second, inconsistent PII-detection pass would be redundant and a source of drift.
+- **Reuses existing vocabulary.** [ADR-004: Deterministic Edge Tokenization with Local Reconstitution](ADR-004%20%E2%80%94%20Deterministic%20Edge%20Tokenization%20with%20Local%20Reconstitution.md) already defines a typed-entity classification (`CHE_PERSON`, `CHE_AHV`, `CHE_IBAN`, `CHE_CANTONAL_ID`) for exactly this kind of field. A second, inconsistent PII-detection pass would be redundant and a source of drift.
 
 ---
 
@@ -61,6 +61,7 @@ If a regulator or DPA rules that permanently undecryptable ciphertext retained i
 ---
 
 ## Related Documents
-- [[ADR-003 — Event-Sourced Agent Ledger & CQRS Audit Model]]
-- [[ADR-004 — Deterministic Edge Tokenization with Local Reconstitution]]
-- [[Swiss AI Hackathon — Apertus]]
+- [ADR-003: Event-Sourced Agent Ledger & CQRS Audit Model](ADR-003%20%E2%80%94%20Event-Sourced%20Agent%20Ledger%20%26%20CQRS%20Audit%20Model.md)
+- [ADR-004: Deterministic Edge Tokenization with Local Reconstitution](ADR-004%20%E2%80%94%20Deterministic%20Edge%20Tokenization%20with%20Local%20Reconstitution.md)
+- [ADR-006: Hackproof WORM Backup for the Event Ledger](ADR-006%20%E2%80%94%20Hackproof%20WORM%20Backup%20for%20the%20Event%20Ledger.md)
+- [Rütli Overview](../../README.md)

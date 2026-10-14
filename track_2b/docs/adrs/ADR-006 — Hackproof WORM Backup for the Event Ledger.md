@@ -9,7 +9,7 @@
 
 ## Context
 
-[[ADR-003 — Event-Sourced Agent Ledger & CQRS Audit Model]] gives the ledger a SHA-256 hash chain, verified by `verify_chain()`. That protects against a *naive* tamper: edit a row's payload without recomputing its hash, and the mismatch is immediately detectable.
+[ADR-003: Event-Sourced Agent Ledger & CQRS Audit Model](ADR-003%20%E2%80%94%20Event-Sourced%20Agent%20Ledger%20%26%20CQRS%20Audit%20Model.md) gives the ledger a SHA-256 hash chain, verified by `verify_chain()`. That protects against a *naive* tamper: edit a row's payload without recomputing its hash, and the mismatch is immediately detectable.
 
 It does **not** protect against a *sophisticated* tamper: an attacker (or a compromised process) with write access to the single SQLite file can rewrite an event's payload **and** recompute every downstream hash to match, producing an internally consistent but false chain. Nothing in ADR-003 requires the hash chain to live anywhere an attacker with DB access can't also reach. A single mutable file, however well hash-chained, is not "hackproof" — it's tamper-*evident* against careless tampering, not tamper-*proof* against a determined one.
 
@@ -58,6 +58,7 @@ If the hackathon's judging criteria or a specific judge profile (e.g. Prof. Dr. 
 ---
 
 ## Related Documents
-- [[ADR-003 — Event-Sourced Agent Ledger & CQRS Audit Model]]
-- [[ADR-005 — Crypto-Shredding for GDPR & FADP Erasure Compatibility]]
-- [[Swiss AI Hackathon — Apertus]]
+- [ADR-003: Event-Sourced Agent Ledger & CQRS Audit Model](ADR-003%20%E2%80%94%20Event-Sourced%20Agent%20Ledger%20%26%20CQRS%20Audit%20Model.md)
+- [ADR-005: Crypto-Shredding for GDPR & FADP Erasure Compatibility](ADR-005%20%E2%80%94%20Crypto-Shredding%20for%20GDPR%20%26%20FADP%20Erasure%20Compatibility.md)
+- [ADR-007: Human-in-the-Loop Reflective Self-Review Layer](ADR-007%20%E2%80%94%20Human-in-the-Loop%20Reflective%20Self-Review%20Layer.md)
+- [Rütli Overview](../../README.md)

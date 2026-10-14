@@ -59,6 +59,6 @@ If the hackathon runtime constraints restrict custom MCP middleware integration 
 ---
 
 ## Related Documents
-- [[ADR-002 — Agent Passport Schema & Cantonal Jurisdiction Claims]]
-- [[ADR-003 — Event-Sourced Agent Ledger & CQRS Audit Model]]
-- [[Swiss AI Hackathon — Apertus]]
+- [ADR-002: Agent Passport Schema & Cantonal Jurisdiction Claims](ADR-002%20%E2%80%94%20Agent%20Passport%20Schema%20%26%20Cantonal%20Jurisdiction%20Claims.md)
+- [ADR-003: Event-Sourced Agent Ledger & CQRS Audit Model](ADR-003%20%E2%80%94%20Event-Sourced%20Agent%20Ledger%20%26%20CQRS%20Audit%20Model.md)
+- [Rütli Overview](../../README.md)
