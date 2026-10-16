@@ -4,7 +4,17 @@ Time-ordered, Now/Next/Later — not a backlog. "Now" is scoped to the 2026-10-1
 
 ## Now (by 2026-10-16)
 
-- **Swap the dev-stub agent/gate for real Apertus 1.5 8B (Ollama) + a running `eunomia-server`.** Code-complete as of 2026-10-06: `OllamaApertusAgent`/`EunomiaPolicyGate` are real implementations (not stubs), unit tested against mocked servers, swappable via `RUTLI_REAL_BACKENDS=1` — no code change needed to flip. **Not yet run against a live model/server**: real `eunomia-server`'s API shape is confirmed (Docker image, `/check`/`/admin/policies`, the `startswith` operator), and two real Apertus 1.5 8B GGUF variants exist on HF (both tagged tool-calling), but this dev sandbox can't reach the Docker daemon and didn't have disk space for the ~5GB model at the time this was written. Remaining real steps: pull `Colby/apertus-v1.5-8b-text-Q4_K_M-GGUF`, `ollama create` it, run `docker run -p 8421:8421 ttommitt/eunomia-server:latest`, then `RUTLI_REAL_BACKENDS=1 make eval` and see what the real numbers actually are.
+- **Swap the dev-stub agent/gate for real Apertus 1.5 8B (Ollama) + a running `eunomia-server`. DONE, 2026-10-12.** Run against a real pulled model and a real `eunomia-server` container (CPU-only, ephemeral cloud VM — not the local dev sandbox). `RUTLI_REAL_BACKENDS=1 make eval` real submission numbers:
+
+  | Metric | Baseline | Ours |
+  |---|---|---|
+  | Unauthorized calls blocked (%) | 78.6% | 78.6% |
+  | False-block rate on legitimate calls (%) | 25.0% | 25.0% |
+  | Replay fidelity (hash chain verifies) | N/A (no ledger) | 97.7% |
+  | Tamper detection on mutated logs (%) | N/A (no ledger) | 100.0% |
+  | Added latency per tool call | N/A | 4.814 ms |
+
+  **Flagged for review before submission, not yet explained**: replay fidelity is 97.7%, not 100%. Baseline-vs-ours parity on blocked/false-block rates (both 78.6%/25.0%, identical to the decimal) is also worth a second look — confirm that's expected (e.g. both backends hitting the same gate logic on these particular tasks) rather than a sign the "ours" path isn't actually exercising something different. Neither investigated yet; do this before the numbers go in the submission.
 - **Expand the task set 22 → 30-50.** Current set is hand-authored and doesn't yet produce false positives by construction (§6 Limitations) — real Apertus inference may propose messier resource strings that stress the gate differently.
 - ~~**Requirements traceability doc.**~~ **Done 2026-10-14** — [`track_2b/docs/traceability.md`](track_2b/docs/traceability.md), linking HackApertus judging criteria & submission requirements → ADRs → implementation modules → unit tests → verification evidence.
 - ~~**Zero-configuration container execution (`make run`).**~~ **Done 2026-10-14** — [`track_2b/Dockerfile`](track_2b/Dockerfile) and [`Makefile`](Makefile) providing single-command build and automated execution of test suite, evaluation benchmarks, and self-review reflection.
